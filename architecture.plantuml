@@ -1,0 +1,41 @@
+@startuml
+
+!include <logos/spring>
+!include <logos/chrome>
+
+' ---- Global Style ----
+skinparam backgroundColor #ffffff
+skinparam shadowing true
+
+skinparam rectangle {
+  BackgroundColor #ffffff
+  BorderColor #6db33f
+  FontColor #000000
+  RoundCorner 20
+  Padding 18
+}
+
+skinparam arrow {
+  Color #6db33f
+  Thickness 2
+}
+
+skinparam defaultFontName Arial
+skinparam defaultFontSize 14
+
+' ---- Elements ----
+rectangle "<$chrome>\nClient" as C
+
+rectangle "<$spring>\nGateway Service" as G
+rectangle "<$spring>\nAuthentication Service" as A
+rectangle "<$spring>\nBusiness Service" as B
+
+' ---- Layout ----
+C -right-> G : Request
+G -up-> A : Authentication check
+A -down-> G : Authentication result
+G -right-> B : Forward request
+B -left-> G : Response
+G -left-> C : Response
+
+@enduml

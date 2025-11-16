@@ -1,71 +1,92 @@
-# So führen Sie einen Software-Performance-Test durch
+# Gateway Bottleneck Lab
 
-## Hintergrund
+[Deutsch](./README_DE.md) | [简体中文](./README_ZH.md)
 
-Als ich als Senior Java-Entwickler in einem Middleware-Team eines Unternehmens in China gearbeitet habe, habe ich ein
-typisches Problem gelöst.  
-Es gab ein Leistungsproblem mit Spring Cloud Gateway. Jemand hat bei uns darüber geklagt, dass die QPS im Vergleich zum
-Betriebsservice zu niedrig ist. Die Services seines Teams bietet direkt Dienst für Kunden an, daher Leistungsprobleme zu
-größeren Problemen führen könnte. Ich habe
-durch einen
-Performance-Test bei
-einigen gängigen
-Tools die
-Gründe der
-Fehler
-gefunden. Deshalb konnten wir sie beheben.  
-Ich finde, es war ein tolles Beispiel dafür, wie Performance-Test durchgeführt wird und wie die Engpässe gefunden
-werden.  
-In diesem Projekt habe ich eine Umgebung, die wie solch ein Problem ähnlich ist, ohne sensible Daten erstellt, damit ich
-allen vorstellen konnte:
+> Based on a real production issue (simplified). It shows why doing small performance tests — especially at the
+> component level (like integration tests) — helps find hidden bottlenecks early and avoids costly problems in large
+> systems.
 
-- Welche Probleme sind aufgetreten?
-- Wie habe ich die behebt?
-- Welche Erfolge wurden erreicht?
+## 🎯 Purpose of the Project
 
-## Vorstellung des Projektes
+This repository provides a **minimal reproducible environment** that shows typical performance problems in a distributed
+architecture (Gateway → Authentication → Business Logic).
 
-Mit Docker habe ich die Testumgebung eingerichtet. In jedem Modul gibt es Skripten für alle Spring-Boot-Service. Im
-Verzeichnis „resources“ vom Hauptverzeichnis gibt es eine „docker-compose“ Datei, mit der man sofort eine Testumgebung
-einrichten kann.
+The scenario is based on a **real production issue**, but it was fully **cleaned**, **simplified**, and contains **no
+confidential data**.
 
-Der Code im Branch [**0.0.1**](https://github.com/ksewen/performance-test-example/tree/0.0.1) gibt es Probleme. Ich habe unwichtige und potenziell vertrauliche Unternehmensdaten
-entfernt und nur das Kernproblem behalten.
+This project helps developers better understand:
 
-Der Code im Branch [**0.0.2**](https://github.com/ksewen/performance-test-example/tree/0.0.2) ......  
-Der Code im Branch **0.0.3** ......
+- why fine-grained performance tests – from simple **benchmarking** to **component** or **integration** tests– are as
+  important as
+  **system-wide performance** tests.
+- how to build **reproducible test environments** to find performance issues **early**.
 
-## Mit Docker ausführen
+## 🧱 Project Overview
 
-### Image erstellen
+The project simulates a **simple** but **realistic** service chain:
+
+- **gateway-for-test** – API Gateway
+- **auth-service-for-test** – Authentication Service
+- **service-for-test** – Business Service
+
+All services are fully **containerized** and can **run alone** or **together with Docker**.
+
+In the branches that contain the full example code (for example **0.0.1**, **0.0.2**, etc.), there is a
+`docker-compose.yml` file inside the **resources/** folder. This file allows you to start the whole test environment
+quickly.
+
+The **main** branch contains only the project description and no runnable code.
+
+A simple architecture diagram:
+
+![Architektur](https://raw.githubusercontent.com/ksewen/Bilder/main/20251116160740231.png)
+
+### Branches
+
+Different branches show different versions of the system:
+
+- Branch [**0.0.1**](https://github.com/ksewen/performance-test-example/tree/0.0.1) contains a planned performance
+  bottleneck. The problem comes from using a **RestTemplate with a synchronous HttpClient inside WebFlux**, which
+  creates high latency under load.
+- Branch [**0.0.2**](https://github.com/ksewen/performance-test-example/tree/0.0.2) fixes the bottleneck from [**0.0.1
+  **](https://github.com/ksewen/performance-test-example/tree/0.0.1) and
+  includes an evaluation of the improvements. During testing, it also shows that **Logback creates noticeable
+  performance cost while writing logs**.
+- Branch [**0.0.3**](https://github.com/ksewen/performance-test-example/tree/0.0.3) fixes and analyses the issues found
+  in [**0.0.2**](https://github.com/ksewen/performance-test-example/tree/0.0.2).
+  It also includes a solution and details for the **blocking issue during UUID generation**.
+
+Each branch contains more detailed explanations, test methods, and results.
+
+## 🐳 Running with Docker
+
+### Build Docker Images
+
+In the project root directory, you can build all service images using the provided scripts:
 
 ```shell
-# Am Anfang klonen Sie den Code auf Ihren Computer und wechseln Sie zum Hauptverzeichnis. Und dann führen Sie den folgenden Code aus.
-# Erstellen des Gateway-Services
 gateway-for-test/resources/scripts/build-image.sh -d .
-
-# Erstellen des Betriebsservices
 service-for-test/resources/scripts/build-image.sh -d .
-
-# Erstellen des Auth-Services
 auth-service-for-test/resources/scripts/build-image.sh -d .
 ```
 
-### Mit docker-compose ausführen
+### Start the Environment
 
 ```shell
 cd resources && \
 docker-compose --compatibility -f docker-compose.yml up
 ```
 
-## Test durchführen
+## 🧪 Functional Test
 
-In diesem Beispiel habe ich nur eine einfache Route im Gateway konfiguriert. Mit folgendem Code kann man auf die
-Schnittstelle zugreifen. Einige Performance-Test-Tools wie Jmeter, wrk usw. können natürlich benutzt werden.
+The Gateway provides a simple test route. You can call it like this:
 
 ```shell
 curl http://127.0.0.1:38071/service/hello
 ```
 
-Meine Wahl ist [**wrk**](https://github.com/wg/wrk). Dieses leichtgewichtige Tool reicht aus, um mir bei der
-Lokalisierung von Problemen zu helfen.
+For more tests, you can also use external tools to create parallel or high-load requests.
+I use a lightweight tool like [**wrk**](https://github.com/wg/wrk), because it is good for simple and reproducible load
+tests.
+
+More detailed examples and results can be found in the related branches (for example **0.0.1**, **0.0.2**).
