@@ -48,8 +48,8 @@ Different branches show different versions of the system:
 - Branch [**0.0.1**](https://github.com/ksewen/performance-test-example/tree/0.0.1) contains a planned performance
   bottleneck. The problem comes from using a **RestTemplate with a synchronous HttpClient inside WebFlux**, which
   creates high latency under load.
-- Branch [**0.0.2**](https://github.com/ksewen/performance-test-example/tree/0.0.2) fixes the bottleneck from [**0.0.1
-  **](https://github.com/ksewen/performance-test-example/tree/0.0.1) and
+- Branch [**0.0.2**](https://github.com/ksewen/performance-test-example/tree/0.0.2) fixes the bottleneck from
+  [**0.0.1**](https://github.com/ksewen/performance-test-example/tree/0.0.1) and
   includes an evaluation of the improvements. During testing, it also shows that **Logback creates noticeable
   performance cost while writing logs**.
 - Branch [**0.0.3**](https://github.com/ksewen/performance-test-example/tree/0.0.3) fixes and analyses the issues found
