@@ -1,5 +1,7 @@
 # Second Test Round
 
+[Deutsch](./README_DE.md) | [简体中文](./README_ZH.md)
+
 ## 🎯 Goal
 
 After the bottleneck from the first test round (a blocking RestTemplate call in the Gateway) was fixed, the system

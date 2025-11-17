@@ -1,5 +1,7 @@
 # 第二轮测试
 
+[English](./README.md) | [Deutsch](./README_DE.md)
+
 ## 🎯 目标
 
 在第一轮测试中（Gateway 内部使用 RestTemplate 造成阻塞）的问题得到修复之后，需要再次确认系统在与 Gateway 集成后整体吞吐能力。

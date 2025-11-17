@@ -1,5 +1,7 @@
 # Die zweite Testrunde
 
+[English](./README.md) | [简体中文](./README_ZH.md)
+
 ## 🎯 Ziel
 
 Nachdem der Engpass aus der ersten Testrunde (blockierender RestTemplate-Aufruf im Gateway) behoben wurde, sollte die
