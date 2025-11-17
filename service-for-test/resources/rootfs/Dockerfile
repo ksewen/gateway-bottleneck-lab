@@ -7,7 +7,7 @@ WORKDIR /service-for-test
 RUN mkdir out && \
     /service-for-test/resources/scripts/build-app.sh
 
-FROM openjdk:17-slim-buster
+FROM openjdk:17-ea-slim
 
 RUN mkdir /service-for-test
 

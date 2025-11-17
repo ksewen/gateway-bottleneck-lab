@@ -1,11 +1,29 @@
-# Die zweite Testrunde
+# Second Test Round
 
-## Durchsatzrate mit Gateway
+## 🎯 Goal
 
-Nach der Behebung sollte ich die neue Durchsatzrate des Backend-Services über das Gateway hinweg kennen, um die Wirkung
-der Optimierung zu demonstrieren.
+After the bottleneck from the first test round (a blocking RestTemplate call in the Gateway) was fixed, the system
+throughput through the Gateway needed to be tested again.
 
-In dieser Runde des Tests habe ich das folgende Ergebnis erhalten:
+The goals of this round were:
+
+- to **measure the effect** of switching to WebClient
+- to find any new **possible bottlenecks**
+- to create a new baseline for later optimizations
+
+## Throughput Test After the Fix
+
+After switching to WebClient, a new five‑minute throughput test was run through the Gateway:
+
+```shell
+wrk -t5 -c10 -d300s --timeout=10s --latency http://127.0.0.1:38071/service/hello
+```
+
+**Result**:
+
+> Requests/sec: 4091.91
+
+Original log:
 
 ```shell
 Running 5m test @ http://127.0.0.1:38071/service/hello
@@ -23,16 +41,75 @@ Requests/sec:   4091.91
 Transfer/sec:    511.49KB
 ```
 
-Die Durchsatzrate war über **4000**. Die Zahl hat sich mehr als 125 % gestiegen.
+### Interpretation
 
-## Analyse
+- Throughput increased from **~1,800 RPS** (before the fix) to **~4,091 RPS**.
+- This is an improvement of **over 125%**.
+- Latency values also **improved clearly**.
 
-In dieser Runde habe ich auch mit Jprofiler überwacht. Dann konnte ich auch Snapshot-Datei analysieren, um die
-Möglichkeit zur Optimierung der Durchsatzrate zu finden.
+Even with this improvement, the expected value (closer to the baseline of ~13,000 RPS) was not reached.  
+So a deeper analysis was needed to find the next bottleneck.
 
-Im folgenden Bild kann man sehen, dass es viel Zeit für die Ausgabe von Loge verbracht hat.
+## Deeper Analysis
 
-![cpu-views-call-tree](https://raw.githubusercontent.com/ksewen/Bilder/main/202308161502704.png "CPU Views - Call Tree")
+As in the first test round, profiling was done again using  
+[JProfiler](https://www.ej-technologies.com/jprofiler).
 
-Zum Glück bietet „Logback“ einen [**AsyncAppender**](https://logback.qos.ch/manual/appenders.html#AsyncAppender) an, mit
-dem man die Ausgabe von Loge vom Arbeit-thread trennen kann.
+A CPU snapshot showed that **a large part of the execution time was used for log output**:
+
+![cpu-views-call-tree](https://raw.githubusercontent.com/ksewen/Bilder/main/202308161502704.png)
+
+### Why does this bottleneck happen?
+
+Logback writes logs **synchronously by default**. This means the working thread must wait until the log entry is
+written.
+
+Under high load, this can cause:
+
+- blocking in the critical request path
+- unnecessary I/O waiting
+- slowdown of the event loop
+- lower total throughput
+
+So it became clear:  
+**After the first fix, synchronous log output was the next important performance factor.**
+
+## Fix
+
+Logback provides an [AsyncAppender](https://logback.qos.ch/manual/appenders.html#AsyncAppender), which moves log writing
+into background threads.
+
+Advantages of the AsyncAppender:
+
+- **reduces load** on the working thread
+- logs are written **asynchronously**
+- **fewer blockings** in the request flow
+- better scaling under high load
+
+Example:
+
+```xml
+
+<appender name="ASYNC" class="ch.qos.logback.classic.AsyncAppender">
+    <appender-ref ref="FILE"/>
+</appender>
+```
+
+With this change, log writing moves out of the main logic, and request handling should become faster.
+
+## Expected Result
+
+After enabling the AsyncAppender, it is expected that:
+
+- latency becomes **lower**
+- throughput becomes **higher**
+- blocking time in the Gateway becomes **smaller**
+
+The real effect will be checked in the 
+[**next test round**](https://github.com/ksewen/gateway-bottleneck-lab/tree/0.0.3?tab=readme-ov-file).
+
+## 🟩 Final Summary
+
+- The first fix (WebClient) was successful: **+125% throughput**.
+- JProfiler showed that **synchronous log output** became the next bottleneck.
+- Logback’s **AsyncAppender** offers a possible solution. Its real effect will be tested in the next round.
