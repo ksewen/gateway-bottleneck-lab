@@ -146,7 +146,10 @@ Starting from **Java 9**, `SecureRandom` was changed according to *JEP 273*:
 
 📌 https://openjdk.org/jeps/273
 
-So the behavior of UUID generation is different in **Java 8** and **Java 17**.
+Because of this change, the old performance bottleneck during UUID generation – which often happened under high load in **Java 8** – does not appear the same way **Java 17**.
+
+**Java 17** already fix the core issue, so the **Java-8** bottleneck cannot be reproduced exactly in this project.
+To keep the lab up to date, I do not downgrade to **Java 8**. Instead, the documentation explains why the behavior is different.
 
 > A detailed Java‑8 analysis and a solution can be found here:
 > 👉 [**uuid-benchmark**](https://github.com/ksewen/uuid-benchmark)
