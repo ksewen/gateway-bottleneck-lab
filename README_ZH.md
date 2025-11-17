@@ -21,11 +21,11 @@ docker stats ${CONTAINER}
 docker stats ${CONTAINER} | awk '{print strftime("%m-%d-%Y %H:%M:%S",systime()), $0}' >> ${FILE_PATH_AND_NAME}
 ```
 
-**结果**：
+**测试结果**：
 
 > Requests/sec: 12994.82
 
-原始输出记录：
+原始输出：
 
 ```shell
 Running 5m test @ http://127.0.0.1:38072/hello
@@ -54,11 +54,11 @@ Backend 服务 CPU 使用率超过 **100%**，说明实例被完全压满。
 wrk -t5 -c10 -d300s --timeout=10s --latency http://127.0.0.1:38071/service/hello
 ```
 
-**结果**:
+**测试结果**:
 
 > Requests/sec: 1811.16
 
-原始输出记录：
+原始输出：
 
 ```shell
 Running 5m test @ http://127.0.1:38071/service/hello
