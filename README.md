@@ -1,5 +1,7 @@
 # The First Test Round
 
+[Deutsch](./README_DE.md) | [简体中文](./README_ZH.md)
+
 ## Baseline Benchmark of the Backend Service
 
 **The first step** of any performance analysis is to check the **maximum throughput** of one single core service.  
@@ -166,7 +168,7 @@ With this change, the system could reach:
 - much **lower latency**
 - much **higher throughput**
 
-## Summary
+## 🟩 Summary
 
 The first test round shows:
 

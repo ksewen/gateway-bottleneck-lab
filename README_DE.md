@@ -1,5 +1,7 @@
 # Die erste Testrunde
 
+[English](./README.md) | [简体中文](./README_ZH.md)
+
 ## Baseline-Benchmark des Backend-Services
 
 **Der erste Schritt** jeder Performanceanalyse ist die **Ermittlung der maximalen Durchsatzrate eines einzelnen
