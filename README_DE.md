@@ -58,6 +58,59 @@ Die verschiedenen Branches enthalten unterschiedliche Zustände des Systems:
 
 Die jeweiligen Branches enthalten ausführliche Erläuterungen zu Testmethoden und Messergebnissen.
 
+## 🧭 Zentrale Erkenntnisse zur Performanceanalyse
+
+Während der Arbeit an diesem Projekt hat sich klar gezeigt, dass Performanceanalysen **nicht** darauf abzielen, **ein einzig
+„richtiges“ Ergebnis zu reproduzieren**. In realen Systemen hängt das Verhalten stark von der jeweiligen Umgebung ab –
+etwa CPU-Leistung, Netzwerktopologie, Container-Runtime oder verwendeten Softwareversionen.
+
+Daraus ergeben sich drei zentrale Prinzipien, die in jedem Performance- oder Bottleneck-Lab berücksichtigt werden
+sollten:
+
+### Komponenten- oder Integrationstests garantieren keine perfekte Systemperformance
+
+Selbst wenn ein einzelner Dienst oder eine Komponente im Benchmark optimal läuft, bedeutet das nicht, dass sich
+dieselbe Performance in einem vollständigen, realen System erzielen lässt.
+
+Der Nutzen dieser feingranularen Tests liegt vor allem darin:
+
+- **frühzeitig offensichtliche Fehler zu entdecken**, bevor sie in komplexen Systemen teuer und schwer reproduzierbar
+  werden
+- **Kosten zu sparen**, weil Probleme bereits auf Komponenten- oder Integrationsebene sichtbar werden
+- Entwicklerinnen und Entwicklern – insbesondere jenen, die **allgemeine oder wiederverwendbare Komponenten**
+  schreiben –
+  ein zuverlässiges Werkzeug für Qualitäts- und Robustheitskontrolle an die Hand zu geben
+
+Diese Tests ersetzen nicht die Systemtests, aber sie bilden die Grundlage für jede solide Performanceanalyse.
+
+### Performance ist immer kontextabhängig
+
+Testergebnisse unterscheiden sich je nach Umgebung oft deutlich.
+Selbst kleine Änderungen – andere Hardware, angepasste Thread-Pools, veränderte Netzwerklatenzen – könnten das Verhalten
+spürbar beeinflussen.
+
+Performanceanalysen müssen daher **mehrmals** und **unter realistischen Bedingungen** durchgeführt werden, um aussagekräftig zu
+sein.
+
+### Optimierung ist immer eine Kosten-Nutzen-Abwägung
+
+In vielen Anwendungsszenarien ist es ebenso wichtig, den Nutzen einer Optimierung mit den Kosten einer einfachen
+horizontalen Skalierung oder Knoten-Erweiterung zu vergleichen.
+Systemweite Performanceoptimierung kann sehr aufwendig werden:
+- Aufbau einer 1:1 oder proportional skalierten **Testumgebung**
+- Erstellen oder Importieren von repräsentativen **Testdaten**
+- Durchführung **mehrerer Testzyklen**
+- hoher **Zeit-** und **Personalaufwand** während der Analyse
+
+Dabei sollte stets bedacht werden:
+
+👉 **Ziel ist „ausreichende“ Performance, nicht maximale Performance.** 
+Eine Optimierung ist nur dann sinnvoll, wenn ihr tatsächlicher Nutzen den technischen und betrieblichen Aufwand rechtfertigt.
+
+Dieses Projekt zeigt genau diese **Methodik**:  
+Nicht das Erreichen einer bestimmten Zahl ist das Ziel, sondern das systematische Identifizieren, Analysieren und
+Beheben von Engpässen – und das realistische Übertragen dieser Vorgehensweise auf produktive Systeme.
+
 ## 🐳 Ausführung mit Docker
 
 ### Docker-Images erstellen

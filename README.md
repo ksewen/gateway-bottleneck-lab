@@ -58,6 +58,51 @@ Different branches show different versions of the system:
 
 Each branch contains more detailed explanations, test methods, and results.
 
+## Key Insights for Performance Testing
+
+While working on this project, it became clear that performance testing **does not** try to **find one single “correct” number**. In real systems, the results can change a lot depending on the environment — for example CPU power, network, container settings, or software versions.
+
+From this experience, three important principles can be learned:
+
+### Component or integration tests do not guarantee perfect system performance
+
+Even if a single service or component shows very good results in a benchmark, it does not mean the whole system will show the same performance.
+
+Small tests are still very useful because they help to:
+
+- **find obvious mistakes early**, before they become expensive and hard to reproduce
+- **save time and cost**, because problems can be found before the system becomes complex
+- give developers — especially those who build **shared or reusable components** — a good tool to check quality and stability
+
+These tests cannot replace system-level tests, but they build the foundation for good performance analysis.
+
+### Performance is always dependent on context
+
+Test results can be very different in different environments. 
+Even small changes — hardware, thread settings, network latency — can make a big difference.
+
+For this reason, performance tests must be done **several times** and **in realistic conditions**.
+
+### Optimization is always a cost–benefit decision
+
+In many systems, it is important to compare the value of code optimization with the cost of simply adding more nodes or scaling horizontally.
+
+Improving performance on a full system can be expensive:
+
+- building a 1:1 or scaled test **environment**
+- creating or importing **realistic test data**
+- running **many test rounds**
+- spending a lot of **time and team effort**
+
+It is important to remember:
+
+👉 **The goal is good enough performance, not maximum performance.**  
+An optimization only makes sense if the benefit is bigger than the cost.
+
+This project demonstrates this **methodology**:  
+The goal is not to reach a specific number, but to systematically find, analyze, and fix bottlenecks — and apply this thinking to real production systems.
+
+
 ## 🐳 Running with Docker
 
 ### Build Docker Images
