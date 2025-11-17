@@ -1,10 +1,26 @@
-# Die dritte Testrunde
+# Third Test Round
 
-## Durchsatzrate mit Gateway
+[Deutsch](./README_DE.md) | [简体中文](./README_ZH.md)
 
-Mit dem AsyncAppender war ich davon enttäuscht, dass die Durchsatzrate sich um **ca. 4 %** gesenkt hat. Dieses
-unerwartete Ergebnis konnte möglicherweise im Zusammenhang damit stehen, dass ich nur ein Zwei-Core im Docker-Image
-eingestellt habe.
+## 🎯 Goal
+
+After the optimizations in the **second test round**, the system was tested again through the gateway.
+The goals of this round were:
+
+- to evaluate the effect of the **AsyncAppender**
+- to find **other possible** hidden bottlenecks
+- to understand differences between this lab setup and real production systems
+- to check whether the system gets closer to the expected performance
+
+## Throughput Test After the Change — Unexpected Result
+
+After enabling the **AsyncAppender**, a new five‑minute throughput test was executed.
+
+**Result**:
+
+> Requests/sec: 3919.34
+
+Original log:
 
 ```shell
 Running 5m test @ http://127.0.0.1:38071/service/hello
@@ -22,22 +38,28 @@ Requests/sec:   3919.34
 Transfer/sec:    489.92KB
 ```
 
-Aber ich war überzeugt davon, dass das eine wirksame Optimierung in mehr als Multicore-Systemen (Quad-Cores oder mehr)
-war.
+The throughput was about 4% **lower** than in the second test round.
 
-## Änderung der Filterstrategie
+### Interpretation
 
-Um andere möglicherweise vorhandene Engpässe zu finden, sollte ich eine Änderung der Filterstrategie vom Jprofiler
-vornehmen. Derweil sollte ich „Monitors & Locks“ auch überwachen.
+Normally the AsyncAppender should reduce work on the request thread. But in this test setup with only **two CPU cores**,
+the extra background thread caused more switching and small performance loss.
 
-In diesem Fall sollte ich zuerst den **AsyncAppender entfernen**, die Konfigurationsdatei befindet sich im Verzeichnis
-„resources“ im Hauptverzeichnis.
+In a production system with **more CPU cores**, the result would likely be different.
 
-Außerdem habe ich auch Log-Level auf „Error“ geändert. Es war natürlich eine praktikable Lösung, weil es im
-Microservice-Framework des Unternehmens solche Features, mit den man Log-Level zur Laufzeit eine Änderung vornehmen
-kann, allgemein bei der Produktion gab.
+## Deeper Analysis
 
-Durch folgendes Ergebnis lässt sich die Durchsatzrate erkennen, dass sie **etwa 6 %** gestiegen ist.
+### Reducing Log Output
+
+The log level was changed to **ERROR**, to reduce I/O operations during each request.
+
+This is also a common practice in real microservice environments.
+
+**Result**:
+
+> Requests/sec: 4369.11
+
+Original log:
 
 ```shell
 Running 5m test @ http://127.0.0.1:38071/service/hello
@@ -55,38 +77,86 @@ Requests/sec:   4369.11
 Transfer/sec:    546.14KB
 ```
 
-## Analyse
+The throughput **increased** by **about 6%**, matching the CPU overhead seen earlier. This confirms:
 
-Um zu beweisen, dass der Gateway-Service derzeit keine offensichtlichen Probleme hatte, habe ich zwei folgende Bilder
-gespeichert.
+Lower log output has a **direct positive effect** on throughput.
+
+### Analysis After Log Optimization
+
+CPU and thread profiles were checked again to confirm that the gateway had no new bottlenecks.
 
 ![cpu-views-call-tree](https://github.com/ksewen/Bilder/blob/main/202308190029673.png?raw=true "CPU Views - Call Tree")
 
-![thread](https://raw.githubusercontent.com/ksewen/Bilder/main/202308190030455.png "Thread")
+The results showed:
 
-Es gab keine offensichtlichen Methoden, die viel Zeit benötigen, und keine sehr häufigen „Block“ und „Wait“ gab es auch.
+- no high amount of **BLOCK** or **WAIT**
+- no signs of **event‑loop blocking**
 
-## Weitere Erklärungen
+So the gateway had **no obvious bottlenecks** after the log reduction.
 
-### Engpass wegen der Generierung von „UUID“
+## Further Explanation
 
-Wenn man Linux als Betriebssystem für den Service verwendet, die Codes in der Class
-„com.github.ksewen.performance.test.gateway.filter.tracing.TracingGlobalFilter“ vielleicht einen Engpass hat, weil in
-der Class die Method „UUID.randomUUID()“ verwendet wird.
+### Improving Profiling Strategy — New Bottleneck Found
 
-Zum Beispiel habe ich ohne die Spezifikation von der Class „SecureRandom“ den Gateway-Service ausgeführt, konnte ich im
-Test solche Blockierung finden.
+In earlier rounds, the JProfiler package filter was limited to `com.github.ksewen` to save time and resources.
+
+To get a full system view, the filter was removed.
+All libraries, frameworks and JVM internals became visible.
+**Monitors & Locks** were also enabled.
+
+This revealed a hidden bottleneck:
+
+👉 **UUID generation**.
+
+### UUID Bottleneck
+
+In the filter
+[TracingGlobalFilter](https://github.com/ksewen/gateway-bottleneck-lab/blob/0.0.3/gateway-for-test/src/main/java/com/github/ksewen/performance/test/gateway/filter/tracing/TracingGlobalFilter.java),
+a UUID is created for every request using: `UUID.randomUUID()`
+
+On Linux, this uses `SecureRandom`.
+If the system uses `/dev/random` and the entropy is low, the call can **block**.
+
+Profiling confirmed this problem:
 
 ![Blockierung-1](https://raw.githubusercontent.com/ksewen/Bilder/main/202308201438817.png)
+
 ![Blockierung-2](https://raw.githubusercontent.com/ksewen/Bilder/main/202308201439720.png)
 
 ![Statistik der Blockierung](https://raw.githubusercontent.com/ksewen/Bilder/main/202308201439000.png)
 
-Um dieses Problem zu umgehen, habe ich folgende Option verwendet, als ich Docker-Image erstellt habe.
+### Fix in This Lab
+
+To avoid the blocking, the JVM was started with:
 
 ```shell
 -Djava.security.egd=file:/dev/urandom
 ```
 
-Um die Benchmark der Generierung von „UUID“ zu testen, beziehen Sie sich bitte auf mein anderes Projekt
-[**uuid-benchmark**](https://github.com/ksewen/uuid-benchmark).
+This makes `SecureRandom` use a **non‑blocking** entropy source.
+
+### Java Version Difference (*JEP 273*)
+
+The behavior also depends on the *Java version*:
+
+- production system before: **Java 8**
+- this lab: **Java 17**
+
+Starting from **Java 9**, `SecureRandom` was changed according to *JEP 273*:  
+
+📌 https://openjdk.org/jeps/273
+
+So the behavior of UUID generation is different in **Java 8** and **Java 17**.
+
+> A detailed Java‑8 analysis and a solution can be found here:
+> 👉 [**uuid-benchmark**](https://github.com/ksewen/uuid-benchmark)
+
+## 🟩 Summary
+
+- The AsyncAppender showed **no improvement** and resulted in a **4% performance drop**.
+- Reducing log output **increased** throughput by **6%**.
+- After the log change, the gateway had **no clear bottlenecks**.
+- A new bottleneck was found: **UUID generation**.
+- The fix using `egd=/dev/urandom` works for **Java 17**, but behaves differently in **Java 8** (*JEP 273*).
+- This round shows the importance of profiling strategy, log management, JVM knowledge, and system context.
+- Performance is always **context‑dependent**, **methodical**, and **rarely perfectly reproducible**.
