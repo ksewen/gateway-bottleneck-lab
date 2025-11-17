@@ -1,24 +1,30 @@
-# Die erste Testrunde
+# The First Test Round
 
-## Betriebssystem-Benchmark
+## Baseline Benchmark of the Backend Service
 
-Am Anfang sollte ich die Durchsatzrate des Backend-Services kennen.
-Mit folgendem Code habe ich den Test durchgeführt.
+**The first step** of any performance analysis is to check the **maximum throughput** of one single core service.  
+Only with this baseline value we can understand later differences, for example when the request goes through the
+Gateway.
+
+To measure the baseline performance, the following command was used with [wrk](https://github.com/wg/wrk):
 
 ```shell
 wrk -t5 -c10 -d300s --timeout=10s --latency http://127.0.0.1:38072/hello
 ```
 
-Derweil sollte ich auch Systemressourcen des Backend-Services überwachen. In diesem Beispiel habe ich direkt „docker
-stats“ benutzt.
+During the test, the **system resources** were monitored via:
 
 ```shell
 docker stats ${CONTAINER}
-# oder in eine Datei Ergebnisse schreiben
+# or write the values to a file:
 docker stats ${CONTAINER} | awk '{print strftime("%m-%d-%Y %H:%M:%S",systime()), $0}' >> ${FILE_PATH_AND_NAME}
 ```
 
-In diesem Test habe ich folgendes Ergebnis erhalten:
+**Result:**
+
+> Requests/sec: 12994.82
+
+Original protocol:
 
 ```shell
 Running 5m test @ http://127.0.0.1:38072/hello
@@ -36,18 +42,23 @@ Requests/sec:  12994.82
 Transfer/sec:      1.56MB
 ```
 
-Und die CPU-Auslastung des Backend-Services lag **über 100%**.
+The backend CPU usage was **over 100%**, which means the instance was fully used.  
+So the baseline performance is **~13,000 RPS**.
 
-## Durchsatzrate mit Gateway
 
-Danach sollte ich die Durchsatzrate des Backend-Services über das Gateway hinweg kennen.  
-Wrk habe ich auch anwendet und mit „docker stats“ habe ich Systemressourcen überwacht.
+## Throughput Test Through the Gateway
+
+**In the second step**, this route was tested through the Gateway:
 
 ```shell
 wrk -t5 -c10 -d300s --timeout=10s --latency http://127.0.0.1:38071/service/hello
 ```
 
-In diesem Test habe ich folgendes Ergebnis erhalten:
+**Result:**
+
+> Requests/sec: 1811.16
+
+Original protocol:
 
 ```shell
 Running 5m test @ http://127.0.0.1:38071/service/hello
@@ -65,49 +76,102 @@ Requests/sec:   1811.16
 Transfer/sec:    226.39KB
 ```
 
-Die CPU-Auslastung des Gateways lag nur **ca. 65 %**.  
-Die CPU-Auslastung des Backend-Services lag nur **ca. 20 %**.  
-Die CPU-Auslastung des Auth-Services lag nur **ca. 30 %**.
+CPU usage during the test:
 
-Das Ergebnis von „Requests/sec“ war nur **1811.16**. Aber es konnte einen Wert **über 12000** einstellen, wenn ich den
-Backend-Service direkt zugegriffen habe. Im Zusammenhang mit dem Systemressourcenaufwand des Gateway-Services lässt sich
-vermuten, dass möglicherweise Engpässe im Gateway vorhanden sind. Anfragen könnten längere Wartezeiten haben, was
-wiederum erheblichen Einfluss auf den Durchsatz der Backend-Services hat.
+- Gateway: **~65%**
+- Business Service: **~20%**
+- Authentication Service: **~30%**
 
-In der nächsten Testrunde brauchte ich einige Tools, um die Engpässe zu finden.
+### Interpretation
 
-## Test mit Jprofiler
+The throughput drops from **~13,000 RPS** (baseline) to only **~1,800 RPS** when the request goes through the Gateway.
 
-[**Jprofiler**](https://www.ej-technologies.com/products/jprofiler/overview.html) ist ein Java Profiling und Testing
-Tool. Mit dem man eine präzise Überwachung der JVM durchführen kann, wobei Heap-Traversal, CPU-Profiling und
-Thread-Profiling effektive Methoden zur Lokalisierung von aktuellen Engpässen im System sind. Aber es ist ein Tool mit
-großem Funktionsumfang. Das könnte möglicherweise zu Leistungsproblemen führen und darf nicht in einer
-Produktionsumgebung verwendet werden.
+At the same time, all services have **low CPU usage**, which means the Gateway may have an internal blocking problem:
 
-Im Image des Gateway-Services habe ich „Jprofiler-Agent“ heruntergeladen. In der Datei „docker-compose.yml“ habe ich das
-Java Argument bereits konfiguriert.
+- **long** waiting times
+- **slow** event-loop
+- **lower** overall throughput
 
-### Konfiguration
+To find the real cause, a deeper analysis is needed.
 
-Mit der Adresse „127.0.0.1:38849“ des Agents des Gateway-Services habe ich mich über die JProfiler-Anwendung
-verbindet.  
-Dann habe ich einen Call Tree Filter „com.github.ksewen“ hinzugefügt. Weil ich in diesem Fall schon gewissen, welcher
-Code am wahrscheinlichsten Probleme verursacht.
+## Why wrk
 
-**In der Praxis werde ich versuchen, die vermuteten Codeabschnitte so weit wie möglich zu überwachen.**
+wrk was used because it is:
 
-Nach der Konfiguration habe ich auch „wrk“ benutzt, um Überwachungsdaten zu erhalten.
+- **very lightweight** (good for repeatable tests)
+- has **very low CPU overhead**
+- gives **accurate latency statistics**
+- **good for micro-benchmarks** that focus on bottlenecks
+- useful when testing **pipeline behaviour**
 
-### Analyse
+Because this project focuses on **throughput** and **latency** distribution, wrk is a perfect fit without adding too
+much overhead.
 
-Im folgenden Bild kann man sehen, dass die Methode „org.springframework.web.client.RestTemplate.postForEntity“ die
-meiste Zeit in Anspruch genommen hat.  
-![cpu-views-call-tree](https://raw.githubusercontent.com/ksewen/Bilder/main/202308161502917.png
-"CPU Views - Call Tree")
+## Detailed Analysis with JProfiler
 
-Es war ein offensichtliches Problem, bei dem im React-Projekt blockierende I/O von RestTemplate (HttpClient) verwendet
-wird.
+Because the CPU usage of the Gateway did not rise much, profiling was needed.  
+For this part, [JProfiler](https://www.ej-technologies.com/products/jprofiler/overview.html) was used.  
+JProfiler supports:
 
-### Behebung
+- CPU profiling
+- thread profiling
+- call tree analysis
+- heap analysis
 
-Um dieses Problem zu beheben, wurde ich **WebClient** anstatt „RestTemplate“ anwenden.
+> Note:  
+> JProfiler has too much overhead for production,  
+> but is ideal for a reproducible test setup like this project.
+
+### Configuration
+
+The JProfiler agent was already added in the Gateway Docker image.  
+The connection was made through: `127.0.0.1:38849`
+
+A call tree filter was added for the package `com.github.ksewen`, because the possible issue was expected there.
+
+During profiling, another wrk test was executed to collect useful data.
+
+### Analysis
+
+The call tree clearly shows that the method:
+
+`org.springframework.web.client.RestTemplate.postForEntity`
+
+uses most of the CPU time.
+
+![cpu-views-call-tree](https://raw.githubusercontent.com/ksewen/Bilder/main/202308161502917.png)
+
+This confirms the problem:
+
+❗ **In a reactive WebFlux environment, a synchronous and blocking RestTemplate with HttpClient was used.**
+
+This leads to:
+
+- blocked threads
+- context switching
+- slow worker pools
+- high latency
+- very low throughput
+
+## Fix
+
+The correct solution is to replace the blocking RestTemplate with **WebClient**, because it:
+
+- uses **non-blocking I/O (Reactor Netty)**
+- is designed for WebFlux
+- does not block the event-loop
+
+With this change, the system could reach:
+
+- much **lower latency**
+- much **higher throughput**
+
+## Summary
+
+The first test round shows:
+
+- The **baseline benchmark (~13k RPS)** proves that the backend works very well.
+- The **gateway throughput test (~1.8k RPS)** shows a strong internal bottleneck.
+- JProfiler confirms the **blocking RestTemplate** call as the cause.
+- A possible next step is to **switch to WebClient** (reactive / non-blocking).  
+  The effect will be checked in the next branches.
