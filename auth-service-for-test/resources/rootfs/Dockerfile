@@ -1,4 +1,4 @@
-FROM maven:3.9.3-sapmachine-17 as builder
+FROM maven:3.9.3-sapmachine-17 AS builder
 
 COPY auth-service-for-test /auth-service-for-test
 
@@ -7,7 +7,7 @@ WORKDIR /auth-service-for-test
 RUN mkdir out && \
     /auth-service-for-test/resources/scripts/build-app.sh
 
-FROM openjdk:17-slim-buster
+FROM openjdk:17-ea-slim
 
 RUN mkdir /auth-service-for-test
 
